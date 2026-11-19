@@ -74,13 +74,50 @@ main{padding:4px 16px 40px;display:flex;flex-direction:column;gap:12px}
 #msg h2{font-size:34px;margin-bottom:8px}
 #msg p{font-size:22px;color:var(--sub);margin-bottom:24px}
 #msg button{font:inherit;font-size:24px;font-weight:800;border:0;border-radius:99px;padding:14px 40px;background:var(--gold);color:#222}
+#msg p{white-space:pre-line}
+
+[hidden]{display:none!important}
+.topr{display:flex;align-items:center;gap:10px}
+.recbtn{font-size:22px;background:#ffffff1a;border:0;border-radius:12px;padding:4px 8px}
+#rec{padding:12px 16px 40px}
+#rec h2{font-size:20px;margin-bottom:8px}
+#back{font:inherit;font-size:16px;font-weight:700;color:#222;background:var(--gold);border:0;border-radius:99px;padding:8px 14px}
+.coins{font-size:28px;font-weight:900;color:var(--gold)}
+.box{background:var(--card);border-radius:20px;padding:12px;margin-top:12px}
+#weekDots{display:flex;justify-content:space-between}
+#weekDots span{display:flex;flex-direction:column;align-items:center;font-size:26px;padding:4px;border-radius:12px}
+#weekDots small{font-size:13px;color:var(--sub)}
+#weekDots .today{background:#ffffff1a}
+#weekText{text-align:center;margin-top:6px;font-weight:700;color:var(--gold)}
+.calhead{display:flex;justify-content:space-between;align-items:center;font-size:18px}
+.calhead button{font-size:18px;background:none;border:0;color:var(--ink);padding:4px 12px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr) 1.1fr;gap:4px;margin-top:8px;text-align:center}
+.grid i{font-style:normal;font-size:13px;color:var(--sub)}
+.grid button{font:inherit;color:var(--ink);background:#ffffff0d;border:2px solid transparent;border-radius:10px;padding:3px 0;min-height:50px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.grid em{font-style:normal;font-size:13px;font-weight:700}
+.grid button div{font-size:12px;letter-spacing:-2px}
+.grid .no{opacity:.2;filter:grayscale(1)}
+.grid .full{background:#ffd23f33;border-color:var(--gold)}
+.grid .today{border-color:#fff}
+.grid .sel{outline:3px solid var(--go)}
+.grid .out,.grid .fut{opacity:.35}
+.wk{display:flex;align-items:center;justify-content:center;font-size:22px}
+.wk.dim{font-size:12px;color:var(--sub)}
+.bt{margin:10px 0 4px;font-weight:700;color:var(--sub)}
+.row{display:flex;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #ffffff14;font-size:16px}
+.row.no{opacity:.45}
+.item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #ffffff14}
+.item .emo{font-size:34px}
+.item b{flex:1;font-size:18px}
+.item button{font:inherit;font-size:17px;font-weight:800;border:0;border-radius:99px;padding:8px 14px;background:var(--gold);color:#222}
+.item button:disabled{background:#ffffff22;color:#ffffff77}
 </style>
 </head>
 <body>
 <header>
   <div class="top">
     <nav><button data-b="morning">🌞 아침</button><button data-b="evening">🌙 저녁</button></nav>
-    <div class="stars" id="stars">⭐ 0</div>
+    <div class="topr"><div class="stars" id="stars">⭐ 0</div><button class="recbtn" id="recBtn" aria-label="기록 보기">📅</button></div>
   </div>
   <h1 id="title"></h1>
   <div class="fuel" id="fuel"></div>
@@ -88,6 +125,16 @@ main{padding:4px 16px 40px;display:flex;flex-direction:column;gap:12px}
   <p id="left"></p>
 </header>
 <main id="list"></main>
+<section id="rec" hidden>
+  <div class="top"><button id="back">← 미션으로</button><div class="coins" id="coins">🪙 0</div></div>
+  <div class="box"><h2>🚀 이번 주 탐험</h2><div id="weekDots"></div><p id="weekText"></p></div>
+  <div class="box">
+    <div class="calhead"><button id="prev">◀</button><b id="month"></b><button id="next">▶</button></div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="box" id="detail"></div>
+  <div class="box"><h2>🎁 코인 상점</h2><div id="shop"></div></div>
+</section>
 <div id="launch" hidden>
   <div id="num"></div>
   <div class="rocket">🚀</div>
@@ -101,10 +148,15 @@ const BOARDS = {
     doneTitle:'아침 미션 성공!', doneText:'유치원으로 출발~ 🚗💨', items:[
     ['😊','세수하기','08:00'], ['🍚','밥 먹기','08:20'], ['🪥','양치하기','08:25'], ['👕','옷 갈아입기','08:35']] },
   evening: { icon:'🌙', title:'하원 후 미션 — 우주 탐험!', start:'17:30', end:'21:00', endWord:'잠자리',
-    doneTitle:'오늘 우주 탐험 완료!', doneText:'좋은 꿈 꿔요 🌙✨', items:[
+    doneTitle:'우주 탐험 완료!', doneText:'좋은 꿈 꿔요 🌙✨', items:[
     ['🧩','크레타클레스 하기','18:00'], ['📒','학습지 하기','18:30'], ['🍚','밥 먹기','19:10'], ['🛁','샤워하기','19:40'],
     ['👕','옷 갈아입기','19:50'], ['🧸','장난감 정리하기','20:30'], ['🪥','양치하기','20:40'], ['🛏️','잠자리에 들어가기','21:00']] },
 };
+
+// 한 주(월~일)에 하루 미션을 전부 끝낸 날이 이만큼 되면 골드코인 1개
+const WEEK_GOAL = 5;
+// 코인 상점 — [그림, 이름, 코인 가격]
+const REWARDS = [['🍦','아이스크림',1], ['🎬','영화 보기',2], ['🚗','장난감 자동차',3], ['🎡','놀이공원 가기',8]];
 
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -116,16 +168,34 @@ function now() {
   return d;
 }
 const nowMin = () => { const d = now(); return d.getHours() * 60 + d.getMinutes(); };
-const dayKey = () => { const d = now(); return `day:${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const dayKey = () => 'day:' + ymd(now());
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const monday = d => addDays(d, -((d.getDay() + 6) % 7));
+const fromYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+
+// ---- 기록 · 골드코인 ----
+function store(k, v) {
+  try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch {}
+}
+const dayData = d => store('day:' + ymd(d)) || {};
+const boardDone = (s, b) => BOARDS[b].items.every((_, i) => s[b]?.[i]);
+const dayDone = s => boardDone(s, 'morning') && boardDone(s, 'evening');
+const weekDone = d => [0, 1, 2, 3, 4, 5, 6].filter(k => dayDone(dayData(addDays(monday(d), k)))).length;
+function earned() { // 목표를 채운 주 하나당 코인 1개
+  let keys = [];
+  try { keys = Object.keys(localStorage).filter(k => k.startsWith('day:')); } catch {}
+  const weeks = new Set(keys.map(k => ymd(monday(fromYmd(k.slice(4))))));
+  return [...weeks].filter(w => weekDone(fromYmd(w)) >= WEEK_GOAL).length;
+}
+const spent = () => store('spent') || [];
+const balance = () => earned() - spent().reduce((a, x) => a + x.price, 0);
 const autoBoard = () => now().getHours() < 12 ? 'morning' : 'evening';
 const fmt = m => m >= 60 ? `${Math.floor(m/60)}시간 ${m%60 ? m%60 + '분' : ''}`.trim() : `${m}분`;
 
 let key = dayKey(), state = load(), auto = autoBoard(), board = auto, dragging = false;
-function load() {
-  try { return JSON.parse(localStorage.getItem(key)) || { morning:{}, evening:{} }; }
-  catch { return { morning:{}, evening:{} }; }
-}
-function save() { try { localStorage.setItem(key, JSON.stringify(state)); } catch {} }
+function load() { return { morning:{}, evening:{}, ...store(key) }; }
+function save() { store(key, state); }
 
 // ---- 소리 · 음성 · 진동 ----
 let ac;
@@ -194,13 +264,15 @@ function tick() {
 function complete(i, knob) {
   const B = BOARDS[board], [, name, dl] = B.items[i];
   const stars = nowMin() <= mins(dl) ? 2 : 1; // 제시간 ⭐⭐, 늦어도 ⭐
+  const before = weekDone(now());
   state[board][i] = stars; save();
+  const coin = before < WEEK_GOAL && weekDone(now()) >= WEEK_GOAL;
   notes([523, 659, 784, 1047]); buzz([60, 40, 140]);
   const from = knob.getBoundingClientRect();
   render();
   $(`.card[data-i="${i}"]`).classList.add('just');
   for (let k = 0; k < stars; k++) setTimeout(() => flyStar(from), k * 180);
-  if (B.items.every((_, j) => state[board][j])) setTimeout(launch, 900);
+  if (B.items.every((_, j) => state[board][j])) setTimeout(() => launch(coin), 900);
   else say(`${name} 완료! 참 잘했어요!`);
 }
 function undo(i) {
@@ -221,7 +293,7 @@ function flyStar(from) {
   };
 }
 
-async function launch() {
+async function launch(coin) {
   const ov = $('#launch'), B = BOARDS[board];
   ov.hidden = false; ov.className = '';
   for (const [n, w] of [[3, '셋'], [2, '둘'], [1, '하나']]) {
@@ -231,8 +303,9 @@ async function launch() {
   for (let k = 0; k < 40; k++) setTimeout(burst, 900 + k * 40);
   await sleep(2600);
   ov.querySelector('h2').textContent = `🎉 ${B.doneTitle}`;
-  ov.querySelector('p').textContent = B.doneText;
-  ov.className = 'go end'; notes([523, 659, 784, 1047, 784, 1047], 'triangle', .14); say(B.doneTitle);
+  ov.querySelector('p').textContent = B.doneText + (coin ? '\n\n🪙 이번 주 골드코인 획득!' : '');
+  ov.className = 'go end'; notes([523, 659, 784, 1047, 784, 1047], 'triangle', .14);
+  say(B.doneTitle + (coin ? ' 골드코인도 받았어요!' : ''));
 }
 function burst() {
   const el = document.createElement('div');
@@ -279,6 +352,65 @@ $('#list').addEventListener('click', e => {
 document.querySelector('nav').addEventListener('click', e => {
   if (e.target.dataset.b) { board = e.target.dataset.b; render(); }
 });
+
+// ---- 기록 페이지: 이번 주, 달력, 하루 상세, 코인 상점 ----
+let calMonth, selDay;
+function showRec(on) {
+  $('header').hidden = $('#list').hidden = on; $('#rec').hidden = !on;
+  if (on) { calMonth = new Date(now().getFullYear(), now().getMonth(), 1); selDay = ymd(now()); renderRec(); scrollTo(0, 0); }
+  else render();
+}
+function renderRec() {
+  const today = ymd(now()), coins = balance();
+  $('#coins').textContent = `🪙 ${coins}`;
+
+  const n = weekDone(now());
+  $('#weekDots').innerHTML = [...'월화수목금토일'].map((w, k) => {
+    const d = addDays(monday(now()), k), ok = dayDone(dayData(d));
+    return `<span class="${ymd(d) === today ? 'today' : ''}"><small>${w}</small>${ok ? '🌟' : ymd(d) > today ? '⚪' : '🌑'}</span>`;
+  }).join('');
+  $('#weekText').textContent = n >= WEEK_GOAL ? '이번 주 골드코인 획득! 🪙' : `${WEEK_GOAL - n}일 더 성공하면 골드코인 🪙`;
+
+  const mo = calMonth.getMonth();
+  $('#month').textContent = `${calMonth.getFullYear()}년 ${mo + 1}월`;
+  let html = [...'월화수목금토일', '🪙'].map(w => `<i>${w}</i>`).join('');
+  for (let w = monday(calMonth); w.getMonth() === mo || w < calMonth; w = addDays(w, 7)) {
+    let cnt = 0;
+    for (let k = 0; k < 7; k++) {
+      const d = addDays(w, k), s = dayData(d), key = ymd(d), full = dayDone(s);
+      cnt += full;
+      const cls = [d.getMonth() !== mo && 'out', key > today && 'fut', full && 'full', key === today && 'today', key === selDay && 'sel'].filter(Boolean).join(' ');
+      html += `<button class="${cls}" data-d="${key}"><em>${d.getDate()}</em>` +
+        (key > today ? '' : `<div><span class="${boardDone(s, 'morning') ? '' : 'no'}">🌞</span><span class="${boardDone(s, 'evening') ? '' : 'no'}">🌙</span></div>`) + '</button>';
+    }
+    html += cnt >= WEEK_GOAL ? '<b class="wk">🪙</b>' : `<b class="wk dim">${cnt}/${WEEK_GOAL}</b>`;
+  }
+  $('#grid').innerHTML = html;
+
+  const d = fromYmd(selDay), s = dayData(d);
+  $('#detail').innerHTML = `<h2>📋 ${d.getMonth() + 1}월 ${d.getDate()}일 미션</h2>` +
+    Object.entries(BOARDS).map(([b, B]) => `<p class="bt">${B.icon} ${b === 'morning' ? '아침' : '하원 후'} ${boardDone(s, b) ? '— 성공! 🚀' : ''}</p>` +
+      B.items.map(([emo, name], i) => `<div class="row ${s[b]?.[i] ? '' : 'no'}"><span>${emo} ${name}</span><span>${s[b]?.[i] ? '⭐'.repeat(s[b][i]) : '—'}</span></div>`).join('')).join('');
+
+  const sp = spent();
+  $('#shop').innerHTML = REWARDS.map(([emo, name, price], i) =>
+    `<div class="item"><span class="emo">${emo}</span><b>${name}</b><button data-r="${i}" ${coins < price ? 'disabled' : ''}>🪙 ${price}</button></div>`).join('') +
+    (sp.length ? '<p class="bt">🎁 받은 선물</p>' + sp.slice().reverse().map(x => `<div class="row"><span>${x.emo} ${x.name}</span><span>${x.date}</span></div>`).join('') : '');
+}
+$('#recBtn').onclick = () => showRec(true);
+$('#back').onclick = () => showRec(false);
+$('#prev').onclick = () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1); renderRec(); };
+$('#next').onclick = () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1); renderRec(); };
+$('#grid').onclick = e => { const b = e.target.closest('button'); if (b) { selDay = b.dataset.d; renderRec(); } };
+$('#shop').onclick = e => {
+  const r = e.target.closest('button')?.dataset.r;
+  if (r == null) return;
+  const [emo, name, price] = REWARDS[r], a = 3 + Math.random() * 7 | 0, b = 3 + Math.random() * 7 | 0;
+  if (prompt(`👨‍👩‍👦 부모님 확인\n${a} × ${b} = ?`) != a * b) return alert('부모님과 함께 바꿔요!');
+  store('spent', [...spent(), { emo, name, price, date: ymd(now()) }]);
+  notes([523, 784, 1047, 1319]); buzz([60, 40, 140]); say(`${name}! 축하해요!`);
+  renderRec();
+};
 
 render();
 setInterval(tick, 20000);
