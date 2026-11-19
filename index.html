@@ -149,8 +149,9 @@ const BOARDS = {
     ['😊','세수하기','08:00'], ['🍚','밥 먹기','08:20'], ['🪥','양치하기','08:25'], ['👕','옷 갈아입기','08:35']] },
   evening: { icon:'🌙', title:'하원 후 미션 — 우주 탐험!', start:'17:30', end:'21:00', endWord:'잠자리',
     doneTitle:'우주 탐험 완료!', doneText:'좋은 꿈 꿔요 🌙✨', items:[
-    ['🧩','크레타클레스 하기','18:00'], ['📒','학습지 하기','18:30'], ['🍚','밥 먹기','19:10'], ['🛁','샤워하기','19:40'],
-    ['👕','옷 갈아입기','19:50'], ['🧸','장난감 정리하기','20:30'], ['🪥','양치하기','20:40'], ['🛏️','잠자리에 들어가기','21:00']] },
+    ['🧩','크레타클레스 하기','18:30'], ['🍚','밥 먹기','18:50'], ['📒','학습지 하기','19:10'], ['📺','영상 보기','19:35'],
+    ['🛁','샤워하기','20:00'], ['👕','옷 갈아입기','20:05'], ['🪥','양치하기','20:10'], ['🧸','장난감 정리하기','20:30'],
+    ['🛏️','잠자리에 들어가기','21:00']] },
 };
 
 // 한 주(월~일)에 하루 미션을 전부 끝낸 날이 이만큼 되면 골드코인 1개
@@ -179,7 +180,10 @@ function store(k, v) {
   try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch {}
 }
 const dayData = d => store('day:' + ymd(d)) || {};
-const boardDone = (s, b) => BOARDS[b].items.every((_, i) => s[b]?.[i]);
+// 그날 미션 개수(len)와 비교 — 시간표를 바꿔도 지난 기록의 성공 여부는 그대로
+// ponytail: 미션은 순서 번호로 저장돼서, 시간표를 바꾸면 지난 날짜 상세의 미션 이름이 어긋날 수 있음
+const OLD_LEN = { morning: 4, evening: 8 }; // len 저장 전 기록용
+const boardDone = (s, b) => Object.keys(s[b] || {}).length >= (s.len?.[b] ?? OLD_LEN[b]);
 const dayDone = s => boardDone(s, 'morning') && boardDone(s, 'evening');
 const weekDone = d => [0, 1, 2, 3, 4, 5, 6].filter(k => dayDone(dayData(addDays(monday(d), k)))).length;
 function earned() { // 목표를 채운 주 하나당 코인 1개
@@ -195,7 +199,7 @@ const fmt = m => m >= 60 ? `${Math.floor(m/60)}시간 ${m%60 ? m%60 + '분' : ''
 
 let key = dayKey(), state = load(), auto = autoBoard(), board = auto, dragging = false;
 function load() { return { morning:{}, evening:{}, ...store(key) }; }
-function save() { store(key, state); }
+function save() { state.len = { morning: BOARDS.morning.items.length, evening: BOARDS.evening.items.length }; store(key, state); }
 
 // ---- 소리 · 음성 · 진동 ----
 let ac;
@@ -229,7 +233,7 @@ function render() {
   document.body.className = board;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.b === board));
   $('#title').textContent = `${B.icon} ${B.title}`;
-  const total = Object.values(state).flatMap(Object.values).reduce((a, b) => a + b, 0);
+  const total = [state.morning, state.evening].flatMap(Object.values).reduce((a, b) => a + b, 0);
   $('#stars').textContent = `⭐ ${total}`;
   $('#fuel').innerHTML = '<b>⛽</b>' + B.items.map((_, i) => `<i class="${done[i] ? 'on' : ''}"></i>`).join('');
 
