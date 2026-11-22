@@ -259,7 +259,7 @@ function render() {
 
 function tick() {
   if (dragging || !$('#launch').hidden) return;
-  if (dayKey() !== key) { key = dayKey(); state = load(); }
+  if (dayKey() !== key) return location.reload(); // 날짜가 바뀌면 새로 열기 — 켜 둔 채로도 매일 새 버전을 받음
   if (autoBoard() !== auto) board = auto = autoBoard();
   render();
 }
