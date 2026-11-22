@@ -111,6 +111,13 @@ main{padding:4px 16px 40px;display:flex;flex-direction:column;gap:12px}
 .item b{flex:1;font-size:18px}
 .item button{font:inherit;font-size:17px;font-weight:800;border:0;border-radius:99px;padding:8px 14px;background:var(--gold);color:#222}
 .item button:disabled{background:#ffffff22;color:#ffffff77}
+.cat{margin:14px 0 2px;font-size:17px;font-weight:800;color:var(--gold)}
+.card.special{background:linear-gradient(135deg,#6a3fd1,#b5338a);border-color:#ffd23f99}
+.card.special.done{background:linear-gradient(135deg,#3f2a7a,#6b2457)}
+#toast{position:fixed;z-index:40;top:12px;left:16px;right:16px;padding:16px;border-radius:18px;background:var(--gold);color:#222;font-size:20px;font-weight:800;text-align:center;box-shadow:0 6px 24px #0008;animation:drop .4s cubic-bezier(.3,1.5,.6,1)}
+#toast.alarm{background:#ff5d73;color:#fff;font-size:22px;padding:22px 16px;animation:drop .4s cubic-bezier(.3,1.5,.6,1),ring .5s .4s 6}
+@keyframes drop{from{transform:translateY(-120%)}}
+@keyframes ring{25%{transform:rotate(-2deg)}75%{transform:rotate(2deg)}}
 </style>
 </head>
 <body>
@@ -133,8 +140,10 @@ main{padding:4px 16px 40px;display:flex;flex-direction:column;gap:12px}
     <div class="grid" id="grid"></div>
   </div>
   <div class="box" id="detail"></div>
+  <div class="box"><h2>🪙 골드코인 받는 방법</h2><div id="rules"></div></div>
   <div class="box"><h2>🎁 코인 상점</h2><div id="shop"></div></div>
 </section>
+<div id="toast" hidden></div>
 <div id="launch" hidden>
   <div id="num"></div>
   <div class="rocket">🚀</div>
@@ -154,10 +163,25 @@ const BOARDS = {
     ['🛏️','잠자리에 들어가기','21:00']] },
 };
 
-// 한 주(월~일)에 하루 미션을 전부 끝낸 날이 이만큼 되면 골드코인 1개
-const WEEK_GOAL = 5;
-// 코인 상점 — [그림, 이름, 코인 가격]
-const REWARDS = [['🍦','아이스크림',1], ['🎬','영화 보기',2], ['🚗','장난감 자동차',3], ['🎡','놀이공원 가기',8]];
+// ---- 골드코인 규칙 ----
+const WEEK_GOAL = 5;      // 한 주(월~일)에 하루 미션을 다 끝낸 날이 5일이면
+const WEEK_COINS = 3;     //   → 🪙3
+const PERFECT_COINS = 2;  // 7일 모두 성공하면 🪙2 더
+const EARLY_MIN = 10;     // 아침·저녁 미션을 마감 10분 전까지 다 끝내면 🪙1 (조기 발사)
+// 요일별 스페셜 미션 (일·월·화·수·목·금·토) — 끝내면 🪙1, 안 해도 하루 성공에는 영향 없음
+const SPECIALS = [['🚶','가족과 산책하기'], ['💌','엄마 아빠께 사랑해요 말하기'], ['👟','현관 신발 정리하기'], ['🪴','화분에 물 주기'],
+  ['📚','그림책 한 권 읽기'], ['🍽️','식탁 차리기 도와주기'], ['🧹','방 청소 도와주기']];
+// 마감 전 알람 — 마감 몇 분 전: 문구
+const ALARMS = {
+  morning: { 15:'유치원 출발 15분 전이에요! 남은 미션을 끝내 볼까?', 5:'5분 뒤에 유치원으로 출발해요! 서둘러요!' },
+  evening: { 15:'잠자리까지 15분 남았어요! 마지막 미션 힘내요!', 5:'5분 뒤에 꿈나라로 출발해요!' },
+};
+// 코인 상점 — 분류별 [그림, 이름, 코인 가격]
+const REWARDS = [
+  ['🍬 간식', [['🍭','막대사탕',3], ['🍫','초콜릿 1개',3], ['🧃','좋아하는 음료수',3], ['🍦','아이스크림',4], ['🍪','과자 한 봉지',4], ['🍩','도넛',5]]],
+  ['🧸 장난감', [['✨','자동차·우주 스티커',3], ['🚗','미니카 1대',10], ['🧩','새 퍼즐',12], ['🚀','로켓·우주 장난감',15], ['🧱','블록 장난감 세트',25]]],
+  ['🎬 즐거운 시간', [['🍿','팝콘 먹으며 가족 영화 보기',8], ['🎟️','극장에서 영화 보기',20]]],
+];
 
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -186,11 +210,22 @@ const OLD_LEN = { morning: 4, evening: 8 }; // len 저장 전 기록용
 const boardDone = (s, b) => Object.keys(s[b] || {}).length >= (s.len?.[b] ?? OLD_LEN[b]);
 const dayDone = s => boardDone(s, 'morning') && boardDone(s, 'evening');
 const weekDone = d => [0, 1, 2, 3, 4, 5, 6].filter(k => dayDone(dayData(addDays(monday(d), k)))).length;
-function earned() { // 목표를 채운 주 하나당 코인 1개
+function earned() { // 주간 목표·개근 코인 + 날마다 받은 보너스(조기 발사, 스페셜 미션)
   let keys = [];
   try { keys = Object.keys(localStorage).filter(k => k.startsWith('day:')); } catch {}
-  const weeks = new Set(keys.map(k => ymd(monday(fromYmd(k.slice(4))))));
-  return [...weeks].filter(w => weekDone(fromYmd(w)) >= WEEK_GOAL).length;
+  let coins = 0;
+  const weeks = new Set();
+  for (const k of keys) {
+    const d = fromYmd(k.slice(4));
+    weeks.add(ymd(monday(d)));
+    coins += Object.keys(dayData(d).bonus || {}).length;
+  }
+  for (const w of weeks) {
+    const n = weekDone(fromYmd(w));
+    if (n >= WEEK_GOAL) coins += WEEK_COINS;
+    if (n === 7) coins += PERFECT_COINS;
+  }
+  return coins;
 }
 const spent = () => store('spent') || [];
 const balance = () => earned() - spent().reduce((a, x) => a + x.price, 0);
@@ -254,39 +289,99 @@ function render() {
         <span class="badge">${'⭐'.repeat(done[i] || 0)}</span></div>
       <div class="track"><span class="hint">자동차를 밀어 주세요 →</span><span class="goal">🏁</span><div class="knob"><span>🚗</span></div></div>
       <div class="stamp">참 잘했어요!</div></section>`;
-  }).join('');
+  }).join('') + specialCard();
+}
+function specialCard() {
+  const [emo, name] = SPECIALS[now().getDay()], ok = state.bonus?.special;
+  return `<section class="card special ${ok ? 'done' : ''}" data-i="sp">
+    <div class="head"><span class="emo">${emo}</span><div><b>${name}</b><small>🌟 오늘의 스페셜 미션 · 🪙 보너스</small></div>
+      <span class="badge">${ok ? '🪙' : ''}</span></div>
+    <div class="track"><span class="hint">자동차를 밀어 주세요 →</span><span class="goal">🪙</span><div class="knob"><span>🚗</span></div></div>
+    <div class="stamp">보너스 획득!</div></section>`;
 }
 
 function tick() {
-  if (dragging || !$('#launch').hidden) return;
   if (dayKey() !== key) return location.reload(); // 날짜가 바뀌면 새로 열기 — 켜 둔 채로도 매일 새 버전을 받음
+  checkAlarms(); keepAwake();
+  if (dragging || !$('#launch').hidden || !$('#rec').hidden) return;
   if (autoBoard() !== auto) board = auto = autoBoard();
   render();
+}
+
+// ---- 마감 전 알람 (앱이 화면에 켜져 있을 때 울림) ----
+const rang = new Set();
+function checkAlarms() {
+  const t = nowMin();
+  for (const [b, list] of Object.entries(ALARMS)) for (const [off, msg] of Object.entries(list)) {
+    const at = mins(BOARDS[b].end) - off, id = key + b + off;
+    if (t >= at && t < at + 2 && !rang.has(id)) { rang.add(id); if (!boardDone(state, b)) alarm(b, msg); }
+  }
+}
+function alarm(b, msg) {
+  if (!$('#rec').hidden) showRec(false);
+  board = b; render();
+  toast(`⏰ ${msg}`, 20000, 'alarm');
+  for (let k = 0; k < 3; k++) setTimeout(() => notes([880, 660, 880, 660], 'square', .12), k * 900);
+  buzz([400, 200, 400, 200, 400]);
+  setTimeout(() => say(msg), 2800);
+}
+let toastTimer;
+function toast(text, ms = 3000, cls = '') {
+  const el = $('#toast');
+  el.textContent = text; el.className = cls; el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, ms);
+}
+$('#toast').onclick = () => $('#toast').hidden = true;
+// 미션 시간대(시작 10분 전 ~ 마감)에는 화면이 꺼지지 않게 — 화면이 꺼지면 알람이 못 울림
+let wake;
+async function keepAwake() {
+  const t = nowMin(), on = Object.values(BOARDS).some(B => t >= mins(B.start) - 10 && t <= mins(B.end));
+  try {
+    if (on && !wake && !document.hidden) { wake = await navigator.wakeLock.request('screen'); wake.onrelease = () => wake = null; }
+    else if (!on && wake) wake.release();
+  } catch {}
 }
 
 // ---- 미션 완료 / 되돌리기 ----
 function complete(i, knob) {
   const B = BOARDS[board], [, name, dl] = B.items[i];
-  const stars = nowMin() <= mins(dl) ? 2 : 1; // 제시간 ⭐⭐, 늦어도 ⭐
-  const before = weekDone(now());
-  state[board][i] = stars; save();
-  const coin = before < WEEK_GOAL && weekDone(now()) >= WEEK_GOAL;
+  const t = nowMin(), stars = t <= mins(dl) ? 2 : 1; // 제시간 ⭐⭐, 늦어도 ⭐
+  const before = weekDone(now()), coins = [];
+  state[board][i] = stars;
+  const boardOk = B.items.every((_, j) => state[board][j]);
+  if (boardOk && t <= mins(B.end) - EARLY_MIN) { state.bonus = { ...state.bonus, [board]: 1 }; coins.push('🚀 조기 발사 보너스 🪙+1'); }
+  save();
+  const after = weekDone(now());
+  if (before < WEEK_GOAL && after >= WEEK_GOAL) coins.push(`🗓️ 이번 주 목표 달성 🪙+${WEEK_COINS}`);
+  if (before < 7 && after === 7) coins.push(`🏆 일주일 개근 🪙+${PERFECT_COINS}`);
   notes([523, 659, 784, 1047]); buzz([60, 40, 140]);
   const from = knob.getBoundingClientRect();
   render();
   $(`.card[data-i="${i}"]`).classList.add('just');
   for (let k = 0; k < stars; k++) setTimeout(() => flyStar(from), k * 180);
-  if (B.items.every((_, j) => state[board][j])) setTimeout(() => launch(coin), 900);
+  if (boardOk) setTimeout(() => launch(coins), 900);
   else say(`${name} 완료! 참 잘했어요!`);
 }
+function doSpecial(knob) {
+  state.bonus = { ...state.bonus, special: 1 }; save();
+  notes([523, 784, 1047, 1319]); buzz([60, 40, 140]);
+  const from = knob.getBoundingClientRect();
+  render();
+  $('.card[data-i="sp"]').classList.add('just');
+  flyStar(from, '🪙');
+  toast('🪙 +1 스페셜 미션 성공!');
+  say(`${SPECIALS[now().getDay()][1]} 성공! 골드코인 보너스!`);
+}
 function undo(i) {
-  delete state[board][i]; save();
+  if (i === 'sp') delete state.bonus?.special;
+  else { delete state[board][i]; delete state.bonus?.[board]; } // 다시 끝내면 그때 조기 발사 여부를 다시 판단
+  save();
   notes([392, 262], 'sine', .14); buzz(40);
   render();
 }
-function flyStar(from) {
+function flyStar(from, emoji = '⭐') {
   const to = $('#stars').getBoundingClientRect(), el = document.createElement('div');
-  el.className = 'fly'; el.textContent = '⭐'; document.body.append(el);
+  el.className = 'fly'; el.textContent = emoji; document.body.append(el);
   el.animate([
     { left: `${from.left}px`, top: `${from.top}px`, transform: 'scale(1)' },
     { left: `${(from.left + to.left) / 2}px`, top: `${Math.min(from.top, to.top) - 60}px`, transform: 'scale(1.8) rotate(180deg)' },
@@ -297,7 +392,7 @@ function flyStar(from) {
   };
 }
 
-async function launch(coin) {
+async function launch(coins) {
   const ov = $('#launch'), B = BOARDS[board];
   ov.hidden = false; ov.className = '';
   for (const [n, w] of [[3, '셋'], [2, '둘'], [1, '하나']]) {
@@ -307,9 +402,9 @@ async function launch(coin) {
   for (let k = 0; k < 40; k++) setTimeout(burst, 900 + k * 40);
   await sleep(2600);
   ov.querySelector('h2').textContent = `🎉 ${B.doneTitle}`;
-  ov.querySelector('p').textContent = B.doneText + (coin ? '\n\n🪙 이번 주 골드코인 획득!' : '');
+  ov.querySelector('p').textContent = B.doneText + (coins.length ? '\n\n' + coins.join('\n') : '');
   ov.className = 'go end'; notes([523, 659, 784, 1047, 784, 1047], 'triangle', .14);
-  say(B.doneTitle + (coin ? ' 골드코인도 받았어요!' : ''));
+  say(B.doneTitle + (coins.length ? ' 골드코인도 받았어요!' : ''));
 }
 function burst() {
   const el = document.createElement('div');
@@ -327,7 +422,7 @@ $('#list').addEventListener('pointerdown', e => {
   const knob = e.target.closest('.knob');
   if (!knob) return;
   audio();
-  const card = knob.closest('.card'), i = +card.dataset.i, wasDone = card.classList.contains('done');
+  const card = knob.closest('.card'), id = card.dataset.i, i = id === 'sp' ? id : +id, wasDone = card.classList.contains('done');
   const max = knob.parentElement.clientWidth - knob.offsetWidth - 8, x0 = e.clientX;
   let d = 0, lastStep = 0;
   dragging = true; knob.setPointerCapture(e.pointerId); knob.style.transition = 'none';
@@ -343,7 +438,7 @@ $('#list').addEventListener('pointerdown', e => {
     knob.removeEventListener('pointermove', move); knob.removeEventListener('pointerup', up); knob.removeEventListener('pointercancel', up);
     dragging = false; knob.style.transition = ''; card.style.removeProperty('--p');
     const p = Math.abs(d) / max;
-    if (p > .8) wasDone ? undo(i) : complete(i, knob);
+    if (p > .8) wasDone ? undo(i) : i === 'sp' ? doSpecial(knob) : complete(i, knob);
     else knob.style.transform = '';
   };
   knob.addEventListener('pointermove', move); knob.addEventListener('pointerup', up); knob.addEventListener('pointercancel', up);
@@ -351,7 +446,8 @@ $('#list').addEventListener('pointerdown', e => {
 // 그림이나 이름을 누르면 읽어 주기
 $('#list').addEventListener('click', e => {
   const head = e.target.closest('.head');
-  if (head) say(BOARDS[board].items[+head.parentElement.dataset.i][1]);
+  const i = head?.parentElement.dataset.i;
+  if (head) say(i === 'sp' ? '스페셜 미션! ' + SPECIALS[now().getDay()][1] : BOARDS[board].items[+i][1]);
 });
 document.querySelector('nav').addEventListener('click', e => {
   if (e.target.dataset.b) { board = e.target.dataset.b; render(); }
@@ -373,7 +469,9 @@ function renderRec() {
     const d = addDays(monday(now()), k), ok = dayDone(dayData(d));
     return `<span class="${ymd(d) === today ? 'today' : ''}"><small>${w}</small>${ok ? '🌟' : ymd(d) > today ? '⚪' : '🌑'}</span>`;
   }).join('');
-  $('#weekText').textContent = n >= WEEK_GOAL ? '이번 주 골드코인 획득! 🪙' : `${WEEK_GOAL - n}일 더 성공하면 골드코인 🪙`;
+  $('#weekText').textContent = n === 7 ? `일주일 개근! 🪙${WEEK_COINS + PERFECT_COINS} 획득 🏆`
+    : n >= WEEK_GOAL ? `이번 주 🪙${WEEK_COINS} 획득! 7일 다 하면 🪙${PERFECT_COINS} 더`
+    : `${WEEK_GOAL - n}일 더 성공하면 골드코인 🪙${WEEK_COINS}`;
 
   const mo = calMonth.getMonth();
   $('#month').textContent = `${calMonth.getFullYear()}년 ${mo + 1}월`;
@@ -394,11 +492,20 @@ function renderRec() {
   const d = fromYmd(selDay), s = dayData(d);
   $('#detail').innerHTML = `<h2>📋 ${d.getMonth() + 1}월 ${d.getDate()}일 미션</h2>` +
     Object.entries(BOARDS).map(([b, B]) => `<p class="bt">${B.icon} ${b === 'morning' ? '아침' : '하원 후'} ${boardDone(s, b) ? '— 성공! 🚀' : ''}</p>` +
-      B.items.map(([emo, name], i) => `<div class="row ${s[b]?.[i] ? '' : 'no'}"><span>${emo} ${name}</span><span>${s[b]?.[i] ? '⭐'.repeat(s[b][i]) : '—'}</span></div>`).join('')).join('');
+      B.items.map(([emo, name], i) => `<div class="row ${s[b]?.[i] ? '' : 'no'}"><span>${emo} ${name}</span><span>${s[b]?.[i] ? '⭐'.repeat(s[b][i]) : '—'}</span></div>`).join('')).join('') +
+    `<p class="bt">🌟 스페셜 미션: ${SPECIALS[d.getDay()][1]} ${s.bonus?.special ? '— 성공! 🪙' : ''}</p>` +
+    (s.bonus?.morning || s.bonus?.evening ? `<p class="bt">🚀 조기 발사: ${[s.bonus.morning && '아침', s.bonus.evening && '하원 후'].filter(Boolean).join(', ')} 🪙</p>` : '');
+
+  $('#rules').innerHTML = [
+    ['🗓️', `한 주에 ${WEEK_GOAL}일 미션 성공`, WEEK_COINS],
+    ['🏆', '일주일 7일 모두 성공하면 더', PERFECT_COINS],
+    ['🚀', `아침·저녁 미션을 마감 ${EARLY_MIN}분 전까지 끝내기`, '1씩'],
+    ['🌟', '오늘의 스페셜 미션 하기', 1],
+  ].map(([e, t, c]) => `<div class="row"><span>${e} ${t}</span><span>🪙${c}</span></div>`).join('');
 
   const sp = spent();
-  $('#shop').innerHTML = REWARDS.map(([emo, name, price], i) =>
-    `<div class="item"><span class="emo">${emo}</span><b>${name}</b><button data-r="${i}" ${coins < price ? 'disabled' : ''}>🪙 ${price}</button></div>`).join('') +
+  $('#shop').innerHTML = REWARDS.map(([cat, list], c) => `<p class="cat">${cat}</p>` + list.map(([emo, name, price], i) =>
+    `<div class="item"><span class="emo">${emo}</span><b>${name}</b><button data-r="${c}-${i}" ${coins < price ? 'disabled' : ''}>🪙 ${price}</button></div>`).join('')).join('') +
     (sp.length ? '<p class="bt">🎁 받은 선물</p>' + sp.slice().reverse().map(x => `<div class="row"><span>${x.emo} ${x.name}</span><span>${x.date}</span></div>`).join('') : '');
 }
 $('#recBtn').onclick = () => showRec(true);
@@ -409,14 +516,14 @@ $('#grid').onclick = e => { const b = e.target.closest('button'); if (b) { selDa
 $('#shop').onclick = e => {
   const r = e.target.closest('button')?.dataset.r;
   if (r == null) return;
-  const [emo, name, price] = REWARDS[r], a = 3 + Math.random() * 7 | 0, b = 3 + Math.random() * 7 | 0;
+  const [c, i] = r.split('-'), [emo, name, price] = REWARDS[c][1][i], a = 3 + Math.random() * 7 | 0, b = 3 + Math.random() * 7 | 0;
   if (prompt(`👨‍👩‍👦 부모님 확인\n${a} × ${b} = ?`) != a * b) return alert('부모님과 함께 바꿔요!');
   store('spent', [...spent(), { emo, name, price, date: ymd(now()) }]);
   notes([523, 784, 1047, 1319]); buzz([60, 40, 140]); say(`${name}! 축하해요!`);
   renderRec();
 };
 
-render();
+tick();
 setInterval(tick, 20000);
 document.addEventListener('visibilitychange', () => !document.hidden && tick());
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
